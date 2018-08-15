@@ -109,7 +109,7 @@ As promised, we will use radare2 framework to achieve this.
 
 ### Stub assembly
 
-I've downloaded ``asm`` ELF file frome remote end and started analysis:
+I've downloaded ``asm`` ELF file from remote end and started analysis:
 
 ```
 $ radare2 -AA ./asm
@@ -130,10 +130,10 @@ I want to get to know what the stub does, we can list (and grep) symbols with th
 ```
 [0x00000b20]> is~stub
 066 0x000020c0 0x002020c0 GLOBAL    OBJ   46 stub
-[0x00000b20]> 
+[0x00000b20]>
 ```
 stub is a globally accessed symbol of size 46. 
-You can view disassembly by seeking (s) to that address, changing the block size to 46, and printing the disassembly.
+You can view disassembly by seeking (s) to that address, changing the block size to 46 (b 46), and printing the disassembly (pd).
 
 ```
 [0x00000b20]> s 0x002020c0
