@@ -75,6 +75,7 @@ $ git merge master_disaster
 
 Afterwards, the history is as follows:
 
+```
 $ git log
 commit 69326de62e3b78074bf8545dfb3531dc594477e3 (HEAD -> master, master_disaster)
 Author: defacedbeef <przemyslaw.duda@gmail.com>
