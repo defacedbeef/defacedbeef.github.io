@@ -66,9 +66,23 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 }
 ```
 
+## build
+
+```
+$ make libfuzzer
+clang++  -fsanitize=fuzzer -g -fPIC -shared test.cpp -o libtest.so 
+# create fuzz target
+clang++  -fsanitize=fuzzer -g fuzz-target.cpp -o libfuzzer ./libtest.so
+mkdir -p fuzzer/libfuzzer
+mv libfuzzer fuzzer/libfuzzer
+mv libtest.so fuzzer/libfuzzer
+$
+```
+
 ## run
 
 ```
+cd fuzzer/libfuzzer
 $ ./libfuzzer 
 INFO: Seed: 3197253394
 INFO: Loaded 2 modules   (5 inline 8-bit counters): 2 [0x7f391e500048, 0x7f391e50004a), 3 [0x67f020, 0x67f023), 
