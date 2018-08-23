@@ -35,7 +35,7 @@ libfuzzer: lib
 	mv $(DSO) fuzzer/libfuzzer
 ```
 
-## Faulty-lib-under-test
+## Faulty-lib-under-test (test.cpp)
 
 ```
 #include <string.h>
@@ -49,7 +49,7 @@ extern "C" int Q_API(const char* message) {
 }
 ```
 
-## Fuzzy target
+## Fuzzy target (fuzz-target.cpp)
 
 ```
 #include <stdint.h>
